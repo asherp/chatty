@@ -35,14 +35,38 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 #     return render_template("index.html", result=result)
 
 
+import unicodedata
+import re
+
+def slugify(value, allow_unicode=False):
+    """
+    Taken from https://github.com/django/django/blob/master/django/utils/text.py
+    Convert to ASCII if 'allow_unicode' is False. Convert spaces or repeated
+    dashes to single dashes. Remove characters that aren't alphanumerics,
+    underscores, or hyphens. Convert to lowercase. Also strip leading and
+    trailing whitespace, dashes, and underscores.
+    """
+    value = str(value)
+    if allow_unicode:
+        value = unicodedata.normalize('NFKC', value)
+    else:
+        value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
+    value = re.sub(r'[^\w\s-]', '', value.lower())
+    return re.sub(r'[-\s]+', '-', value).strip('-_')
+
+def save_prompt(prompt, char_length=20, min_length=100):
+    """save the prompt to a file named after the first and last characters"""
+    if len(prompt) > min_length:
+        fname = prompt[:char_length] + '__' + prompt[-char_length:]
+        fname = slugify(fname).strip()
+        with open(f'stories/{fname}.txt', 'w') as f:
+            f.write(prompt)
 
     
 def pass_through(submit,
     opt_1_clicks, opt_2_clicks, opt_3_clicks,
     prompt, opt_1, opt_2, opt_3, temperature):
 
-    # if opt_1_clicks == 0:
-    #     raise PreventUpdate
 
     button_id = get_triggered()
 
@@ -54,11 +78,13 @@ def pass_through(submit,
         elif '3' in button_id:
             prompt += opt_3
 
+    save_prompt(prompt)
+
     options = []
     for i in range(3):
         response = openai.Completion.create(
                 model="text-davinci-002",
-                prompt=prompt.strip(),
+                prompt=prompt.strip(), # strip prevents response from stopping
                 temperature=temperature,
             )
 
